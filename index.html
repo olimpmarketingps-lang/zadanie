@@ -154,6 +154,7 @@ button.primary{background:var(--btn); color:var(--btn-ink); font-size:1.05rem; p
   <div class="meta" aria-hidden="true">
     <span id="time">Czas 0:00</span>
     <span id="attempts">Sprawdzenia 0</span>
+    <span>Wersja 3</span>
   </div>
 </main>
 
@@ -313,16 +314,24 @@ button.primary{background:var(--btn); color:var(--btn-ink); font-size:1.05rem; p
     Object.keys(slotEls).forEach(function(k){ slotEls[k].classList.toggle('over', k === t); });
     trayEl.classList.toggle('over', t === 'tray');
   }
+  function cleanupDrag(){
+    document.querySelectorAll('.ghost').forEach(function(g){ g.remove(); });
+    document.querySelectorAll('.tile.dragging').forEach(function(t){ t.classList.remove('dragging'); });
+    highlight(null);
+  }
+  window.addEventListener('blur', cleanupDrag);
   function onPointerDown(e){
     if (e.button !== undefined && e.button !== 0) return;
+    cleanupDrag();
     var el = e.currentTarget, id = el.dataset.id;
     var sx = e.clientX, sy = e.clientY;
     var rect = el.getBoundingClientRect();
     var offX = sx - rect.left, offY = sy - rect.top;
-    var ghost = null;
-    try { el.setPointerCapture(e.pointerId); } catch(_){}
+    var ghost = null, pid = e.pointerId;
+    e.preventDefault();
 
     function move(ev){
+      if (ev.pointerId !== pid) return;
       if (!ghost){
         if (Math.hypot(ev.clientX - sx, ev.clientY - sy) < 6) return;
         ghost = el.cloneNode(true);
@@ -332,17 +341,19 @@ button.primary{background:var(--btn); color:var(--btn-ink); font-size:1.05rem; p
         ghost.style.height = rect.height + 'px';
         document.body.appendChild(ghost);
         el.classList.add('dragging');
-        selected = null; render();
+        selected = null;
+        TILES.forEach(function(t){ tileEls[t.id].classList.remove('selected'); });
         startTimer();
       }
+      ev.preventDefault();
       ghost.style.transform = 'translate(' + (ev.clientX - offX) + 'px,' + (ev.clientY - offY) + 'px)';
       highlight(dropTarget(ev.clientX, ev.clientY));
     }
     function up(ev){
-      el.removeEventListener('pointermove', move);
-      el.removeEventListener('pointerup', up);
-      el.removeEventListener('pointercancel', up);
-      try { el.releasePointerCapture(e.pointerId); } catch(_){}
+      if (ev.pointerId !== pid) return;
+      document.removeEventListener('pointermove', move);
+      document.removeEventListener('pointerup', up);
+      document.removeEventListener('pointercancel', up);
       if (ghost){
         var t = ev.type === 'pointercancel' ? null : dropTarget(ev.clientX, ev.clientY);
         ghost.remove();
@@ -353,9 +364,9 @@ button.primary{background:var(--btn); color:var(--btn-ink); font-size:1.05rem; p
         tileClick(id);
       }
     }
-    el.addEventListener('pointermove', move);
-    el.addEventListener('pointerup', up);
-    el.addEventListener('pointercancel', up);
+    document.addEventListener('pointermove', move);
+    document.addEventListener('pointerup', up);
+    document.addEventListener('pointercancel', up);
   }
 
   /* ---------- check ---------- */
